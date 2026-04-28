@@ -7,6 +7,9 @@ Type=simple
 User=partsmall
 Group=partsmall
 WorkingDirectory=/opt/partsmall
+# Streamlit reads ~/.streamlit/secrets.toml on startup — ProtectHome blocks /home,
+# so point HOME to our writable app dir.
+Environment=HOME=/opt/partsmall
 EnvironmentFile=/opt/partsmall/.env
 ExecStart=/opt/partsmall/.venv/bin/streamlit run admin/admin_app.py \
     --server.port 8501 \

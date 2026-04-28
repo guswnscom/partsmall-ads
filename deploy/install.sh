@@ -71,6 +71,14 @@ setup_venv() {
     "
 }
 
+seed_db() {
+    echo "==> Seeding branches + staff (idempotent)"
+    sudo -u "${APP_USER}" bash -c "
+        cd '${APP_DIR}' && \
+        DB_PATH='${APP_DIR}/data/partsmall.db' .venv/bin/python -m core.seed
+    " || echo "  (seed step warned — check above; continuing)"
+}
+
 ensure_data_dirs() {
     echo "==> Ensuring data + uploads directories"
     sudo -u "${APP_USER}" mkdir -p \
@@ -143,6 +151,7 @@ main() {
     ensure_data_dirs
     setup_venv
     ensure_env
+    seed_db
     install_systemd
     install_caddy
     setup_firewall
