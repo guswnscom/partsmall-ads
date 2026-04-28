@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}PARTS-MALL — Pick your branch{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Genuine Korean Auto Parts</h1>
+  <p class="lead">Hyundai · Kia · Chevrolet · Suzuki · Ssangyong — and more.</p>
+  <p>Choose your nearest branch to chat on WhatsApp.</p>
+</section>
+<section class="branches">
+  {% for b in branches %}
+    <a class="branch-card" href="/{{ b['code'] }}">
+      <h2>{{ b['name'] }}</h2>
+      <p>{{ b['city'] }}</p>
+      <span class="cta">Chat on WhatsApp →</span>
+    </a>
+  {% endfor %}
+</section>
+{% endblock %}

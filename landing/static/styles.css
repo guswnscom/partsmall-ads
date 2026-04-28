@@ -1,0 +1,102 @@
+/* PARTS-MALL landing — mobile first, fast.
+   Brand: blue #1e3a8a, green #16a34a, WhatsApp green #25D366. */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #1f2937;
+  background: #f9fafb;
+  line-height: 1.5;
+}
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; background: white; border-bottom: 1px solid #e5e7eb;
+}
+.brand img { height: 36px; }
+.status { font-size: 13px; font-weight: 600; }
+.status.open { color: #16a34a; }
+.status.closed { color: #dc2626; font-size: 11px; max-width: 60%; text-align: right; }
+
+main { max-width: 720px; margin: 0 auto; padding: 24px 16px; }
+
+.hero h1 { font-size: 28px; margin: 0 0 8px; color: #1e3a8a; }
+.hero .lead { font-size: 17px; margin: 0 0 6px; color: #16a34a; font-weight: 600; }
+.hero p { margin: 0 0 16px; }
+
+.branches { display: grid; gap: 16px; margin-top: 24px; }
+.branch-card {
+  display: block; padding: 24px; background: white; border-radius: 12px;
+  text-decoration: none; color: inherit; border: 2px solid #e5e7eb;
+  transition: border-color .15s;
+}
+.branch-card:hover, .branch-card:active { border-color: #1e3a8a; }
+.branch-card h2 { margin: 0 0 4px; color: #1e3a8a; }
+.branch-card p { margin: 0 0 12px; color: #6b7280; }
+.branch-card .cta { color: #25D366; font-weight: 700; }
+
+.part-form { background: white; padding: 20px; border-radius: 12px; margin-top: 16px; }
+.part-form label { display: block; font-weight: 600; margin: 16px 0 8px; }
+
+.brand-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.brand-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 14px; border: 2px solid #e5e7eb; border-radius: 999px;
+  background: #f9fafb; cursor: pointer; font-size: 14px;
+}
+.brand-pill.priority { border-color: #1e3a8a; background: #eff6ff; font-weight: 600; }
+.brand-pill input { accent-color: #1e3a8a; }
+
+.part-form input[type="text"] {
+  width: 100%; padding: 12px 14px; font-size: 16px;
+  border: 2px solid #e5e7eb; border-radius: 8px;
+  background: #f9fafb;
+}
+.part-form input[type="text"]:focus { outline: none; border-color: #1e3a8a; }
+
+.file-picker {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 12px; border: 2px solid #e5e7eb; border-radius: 8px;
+  background: #f9fafb;
+}
+.file-btn {
+  padding: 10px 16px; font-size: 14px; font-weight: 600;
+  background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer;
+  white-space: nowrap;
+}
+.file-btn:hover { background: #1e40af; }
+.file-name {
+  font-size: 14px; color: #6b7280; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.photo-preview {
+  margin-top: 12px; max-width: 100%; max-height: 240px;
+  border-radius: 8px; display: none;
+}
+.photo-preview.show { display: block; }
+
+.cta-btn {
+  width: 100%; margin-top: 20px; padding: 16px;
+  background: #25D366; color: white; font-size: 18px; font-weight: 700;
+  border: none; border-radius: 12px; cursor: pointer;
+}
+.cta-btn:hover { background: #1ebe5a; }
+
+.micro { font-size: 12px; color: #6b7280; margin-top: 12px; text-align: center; }
+
+.vin-or-disc {
+  margin-top: 8px; padding: 14px; background: #eff6ff;
+  border: 1px dashed #1e3a8a; border-radius: 10px;
+}
+.vin-or-disc label { margin-top: 8px; }
+.vin-or-disc label:first-child { margin-top: 0; }
+.hint {
+  font-size: 13px; color: #4b5563; margin: 12px 0 4px;
+  padding: 0; line-height: 1.5;
+}
+
+footer {
+  text-align: center; padding: 24px 16px; color: #6b7280; font-size: 13px;
+}
+footer p { margin: 4px 0; }

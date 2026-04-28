@@ -1,0 +1,28 @@
+[Unit]
+Description=PARTS-MALL Admin (Streamlit)
+After=network.target
+
+[Service]
+Type=simple
+User=partsmall
+Group=partsmall
+WorkingDirectory=/opt/partsmall
+EnvironmentFile=/opt/partsmall/.env
+ExecStart=/opt/partsmall/.venv/bin/streamlit run admin/admin_app.py \
+    --server.port 8501 \
+    --server.address 127.0.0.1 \
+    --server.headless true \
+    --browser.gatherUsageStats false
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/partsmall/data /opt/partsmall/uploads /opt/partsmall/generated
+
+[Install]
+WantedBy=multi-user.target

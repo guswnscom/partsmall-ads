@@ -1,0 +1,25 @@
+[Unit]
+Description=PARTS-MALL Landing (FastAPI + Uvicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=partsmall
+Group=partsmall
+WorkingDirectory=/opt/partsmall
+EnvironmentFile=/opt/partsmall/.env
+ExecStart=/opt/partsmall/.venv/bin/uvicorn landing.main:app --host 127.0.0.1 --port 8000 --workers 2
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/partsmall/data /opt/partsmall/uploads /opt/partsmall/generated
+
+[Install]
+WantedBy=multi-user.target

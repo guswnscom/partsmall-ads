@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}PARTS-MALL {{ branch['name'] }} — WhatsApp us{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>{{ branch['name'] }}</h1>
+  <p class="lead">Tell us what you need — we'll reply on WhatsApp.</p>
+</section>
+<form class="part-form" method="post" action="/go/{{ branch['code'] }}" enctype="multipart/form-data">
+  <input type="hidden" name="utm_source" value="{{ request.query_params.get('utm_source','') }}" />
+  <input type="hidden" name="utm_campaign" value="{{ request.query_params.get('utm_campaign','') }}" />
+  <input type="hidden" name="campaign_id" value="{{ request.query_params.get('cid','') }}" />
+
+  <label>Car brand</label>
+  <div class="brand-grid">
+    {% for b in priority_brands %}
+      <label class="brand-pill priority">
+        <input type="radio" name="brand" value="{{ b }}" required /> {{ b }}
+      </label>
+    {% endfor %}
+    {% for b in other_brands %}
+      <label class="brand-pill">
+        <input type="radio" name="brand" value="{{ b }}" /> {{ b }}
+      </label>
+    {% endfor %}
+  </div>
+
+  <label for="part">Part you need (optional)</label>
+  <input id="part" name="part" type="text" placeholder="e.g. brake pads, oil filter, alternator" />
+
+  <div class="vin-or-disc">
+    <label for="vin">VIN number (optional, helps us find the exact part)</label>
+    <input id="vin" name="vin" type="text" maxlength="17"
+           placeholder="17 characters, e.g. KMHCT41BAEU123456"
+           autocapitalize="characters" autocomplete="off" />
+
+    <p class="hint">Don't know your VIN? Upload a photo of your <strong>license disc</strong> instead — we'll read it.</p>
+
+    <label>License disc photo (optional)</label>
+    <div class="file-picker">
+      <input id="license_disc" name="license_disc" type="file" accept="image/*" capture="environment" hidden />
+      <button type="button" class="file-btn" data-target="license_disc">Choose photo</button>
+      <span class="file-name" data-for="license_disc">No file chosen</span>
+    </div>
+    <img id="license-disc-preview" class="photo-preview" alt="license disc preview" />
+  </div>
+
+  <label>Photo of the part you need (optional)</label>
+  <div class="file-picker">
+    <input id="part_photo" name="part_photo" type="file" accept="image/*" capture="environment" hidden />
+    <button type="button" class="file-btn" data-target="part_photo">Choose photo</button>
+    <span class="file-name" data-for="part_photo">No file chosen</span>
+  </div>
+  <img id="part-photo-preview" class="photo-preview" alt="part preview" />
+
+  <button type="submit" class="cta-btn">Chat on WhatsApp →</button>
+  <p class="micro">By continuing you agree to chat with our {{ branch['name'] }} sales team on WhatsApp.</p>
+</form>
+<script>
+  // Custom file pickers — guarantees English UI regardless of browser locale
+  document.querySelectorAll('.file-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById(btn.dataset.target).click();
+    });
+  });
+
+  function attachPreview(inputId, previewId) {
+    const input = document.getElementById(inputId);
+    const preview = document.getElementById(previewId);
+    const nameSpan = document.querySelector(`.file-name[data-for="${inputId}"]`);
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      if (!file) {
+        preview.classList.remove('show');
+        nameSpan.textContent = 'No file chosen';
+        return;
+      }
+      nameSpan.textContent = file.name;
+      preview.src = URL.createObjectURL(file);
+      preview.classList.add('show');
+    });
+  }
+  attachPreview('license_disc', 'license-disc-preview');
+  attachPreview('part_photo', 'part-photo-preview');
+</script>
+{% endblock %}

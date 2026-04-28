@@ -1,0 +1,45 @@
+# PARTS-MALL production Caddyfile
+# Deployed to /etc/caddy/Caddyfile by deploy/install.sh
+#
+# - psms-pmaad.co.za + www: customer landing (FastAPI on 127.0.0.1:8000)
+# - admin.psms-pmaad.co.za: manager admin UI (Streamlit on 127.0.0.1:8501)
+#   Protected by HTTP Basic Auth.
+#
+# Caddy automatically obtains and renews Let's Encrypt SSL certs.
+# Make sure DNS A records for both names point to this server.
+
+psms-pmaad.co.za, www.psms-pmaad.co.za {
+    encode gzip zstd
+
+    # Don't cache HTML — but cache static assets aggressively
+    @static {
+        path /static/* /assets/* /photo/*
+    }
+    header @static Cache-Control "public, max-age=2592000"
+
+    reverse_proxy 127.0.0.1:8000
+
+    log {
+        output file /var/log/caddy/landing.log {
+            roll_size 50mb
+            roll_keep 5
+        }
+    }
+}
+
+admin.psms-pmaad.co.za {
+    encode gzip
+
+    # Streamlit needs WebSocket pass-through. Caddy reverse_proxy handles it by default.
+    basicauth {
+        # Set with: caddy hash-password
+        # The line below MUST be replaced after install — see install.sh.
+        manager $2a$14$REPLACE_ME_WITH_REAL_HASH
+    }
+
+    reverse_proxy 127.0.0.1:8501
+
+    log {
+        output file /var/log/caddy/admin.log
+    }
+}
