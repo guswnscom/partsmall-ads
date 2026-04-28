@@ -26,6 +26,30 @@ from core.seed import seed       # noqa: E402
 from core.director import generate_and_save  # noqa: E402
 from core.asset_generator import generate_poster_for_variant, is_enabled as poster_enabled  # noqa: E402
 
+
+# Cost (USD) per generated image by model + quality.
+_COST_USD_BY_KEY = {
+    ("gpt-image-1", "low"):    0.011,
+    ("gpt-image-1", "medium"): 0.042,
+    ("gpt-image-1", "high"):   0.167,
+    ("dall-e-3", "standard"):  0.040,
+    ("dall-e-3", "hd"):        0.080,
+}
+
+
+def _poster_cost_label() -> str:
+    """Return e.g. '~R3.20 ($0.17)' based on env-configured model+quality.
+    USD->ZAR fallback to R19 if OPENAI_USD_TO_ZAR not set."""
+    model = os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-1")
+    quality = os.getenv("OPENAI_IMAGE_QUALITY", "high").lower()
+    usd = _COST_USD_BY_KEY.get((model, quality), 0.167)
+    try:
+        rate = float(os.getenv("OPENAI_USD_TO_ZAR", "19"))
+    except ValueError:
+        rate = 19.0
+    zar = usd * rate
+    return f"~R{zar:.2f} (${usd:.2f})"
+
 UPLOADS = ROOT / "uploads"
 UPLOADS.mkdir(exist_ok=True)
 
@@ -321,12 +345,12 @@ def page_campaigns():
                             st.caption("No poster yet")
                             if poster_enabled():
                                 if st.button(
-                                    "🎨 Generate Poster (~$0.04)",
+                                    f"🎨 Generate Poster ({_poster_cost_label()})",
                                     key=f"ac_poster{c['id']}",
                                     help="AI generates a unique poster image for this variant"
                                 ):
                                     try:
-                                        with st.spinner("Generating poster (15-30 sec)..."):
+                                        with st.spinner("Generating poster (30-60 sec at high quality)..."):
                                             path = generate_poster_for_variant(c["id"])
                                         if path:
                                             st.success("Poster ready ✅")
@@ -358,12 +382,12 @@ def page_campaigns():
                         st.caption(f"On: **{platforms_str}**")
                         if c["asset_path"] and poster_enabled():
                             if st.button(
-                                "🔄 Regenerate Poster",
+                                f"🔄 Regenerate Poster ({_poster_cost_label()})",
                                 key=f"ac_repost{c['id']}",
-                                help="Replace current poster with a new AI generation (~$0.04)"
+                                help="Replace current poster with a new AI generation"
                             ):
                                 try:
-                                    with st.spinner("Regenerating..."):
+                                    with st.spinner("Regenerating (30-60 sec)..."):
                                         path = generate_poster_for_variant(c["id"])
                                     if path:
                                         st.success("New poster ready")
