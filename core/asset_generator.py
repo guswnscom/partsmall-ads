@@ -25,7 +25,7 @@ import secrets
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from .db import db
 
@@ -36,11 +36,82 @@ ASSETS_DIR = ROOT / "assets"
 GENERATED_DIR = ROOT / "generated"
 GENERATED_DIR.mkdir(exist_ok=True)
 
+# Prefer the OFFICIAL DISTRIBUTOR variant if present, else fall back to plain logo.
+LOGO_OFFICIAL_PATH = ASSETS_DIR / "logo-official.png"
 LOGO_PATH = ASSETS_DIR / "logo.png"
 
+
+def _resolve_logo_path() -> Optional[Path]:
+    if LOGO_OFFICIAL_PATH.exists():
+        return LOGO_OFFICIAL_PATH
+    if LOGO_PATH.exists():
+        return LOGO_PATH
+    return None
+
+
+def _prepare_logo(target_height: int = 140) -> Optional[Image.Image]:
+    """Load logo, remove the rectangular white background, add a soft white halo
+    so it blends with any poster bg while staying legible.
+    Returns RGBA image or None if logo missing.
+    """
+    logo_path = _resolve_logo_path()
+    if not logo_path:
+        return None
+    try:
+        logo = Image.open(logo_path).convert("RGBA")
+    except Exception as e:
+        log.warning("Logo load failed: %s", e)
+        return None
+
+    # 1. Make near-white pixels transparent (kills the rectangular bg + small inner noise)
+    threshold = 245
+    pixels = list(logo.getdata())
+    new_pixels = []
+    for r, g, b, a in pixels:
+        if a < 10 or (r >= threshold and g >= threshold and b >= threshold):
+            new_pixels.append((r, g, b, 0))
+        else:
+            new_pixels.append((r, g, b, a))
+    logo.putdata(new_pixels)
+
+    # 2. Resize to target height keeping aspect ratio
+    ratio = target_height / logo.height
+    logo = logo.resize(
+        (int(logo.width * ratio), target_height), Image.LANCZOS
+    )
+
+    # 3. Build a soft white halo behind the logo silhouette for legibility on any bg
+    pad = 24
+    canvas_size = (logo.width + pad * 2, logo.height + pad * 2)
+    alpha = logo.split()[3]
+
+    # Halo: blur the alpha, boost it, fill with white
+    halo_alpha = alpha
+    # Place alpha onto larger canvas at offset (pad, pad)
+    halo_alpha_canvas = Image.new("L", canvas_size, 0)
+    halo_alpha_canvas.paste(halo_alpha, (pad, pad))
+    halo_alpha_canvas = halo_alpha_canvas.filter(
+        ImageFilter.GaussianBlur(radius=10)
+    )
+    # Boost intensity so the halo is visible but soft
+    halo_alpha_canvas = halo_alpha_canvas.point(
+        lambda v: min(255, int(v * 2.2))
+    )
+
+    halo = Image.new("RGBA", canvas_size, (255, 255, 255, 0))
+    halo.putalpha(halo_alpha_canvas)
+
+    # Composite: halo + logo on top, both in canvas coordinates
+    final = Image.new("RGBA", canvas_size, (0, 0, 0, 0))
+    final.alpha_composite(halo, (0, 0))
+    final.alpha_composite(logo, (pad, pad))
+    return final
+
 DEFAULT_MODEL = "gpt-image-1"
-DEFAULT_QUALITY = "medium"  # gpt-image-1: low/medium/high
-FALLBACK_DALLE_QUALITY = "standard"  # dall-e-3: standard/hd
+# 'high' costs ~$0.17 vs 'medium' $0.04 — but the AI-tell drops dramatically.
+# We default to high for ad-quality output. Override via OPENAI_IMAGE_QUALITY env.
+DEFAULT_QUALITY = "high"
+FALLBACK_DALLE_QUALITY = "hd"  # dall-e-3: standard/hd
 
 # Brand colors
 NAVY = (30, 58, 138)        # #1e3a8a
@@ -48,36 +119,48 @@ EMERALD = (22, 163, 74)     # #16a34a
 WHATSAPP_GREEN = (37, 211, 102)  # #25D366
 WHITE = (255, 255, 255)
 
-# Per-angle visual scene descriptors. Each must produce ad-friendly imagery
-# without text, with bottom-third left clean for our overlay.
+# Per-angle visual scene descriptors. Documentary / studio photography style.
+# Critical: every scene assumes a STRICT "no text, no fake brand graphics on
+# boxes/products" rule enforced by the prompt builder below.
 ANGLE_SCENES: Dict[str, str] = {
     "stock": (
-        "neatly stacked Korean automotive part boxes on bright clean warehouse shelves, "
-        "rich product variety visible, sense of abundant inventory"
+        "documentary photography of a clean modern automotive parts warehouse interior. "
+        "Industrial steel shelving stacked with PLAIN solid navy-blue and dark-teal "
+        "cardboard boxes of varying sizes (no printed graphics or labels on the boxes). "
+        "Selective focus showing rows of boxes receding into soft depth-of-field, "
+        "natural overhead warehouse lighting"
     ),
     "trust": (
-        "premium brake disc and brake pads set arranged on a clean studio backdrop, "
-        "soft directional lighting, flagship product photography feel, premium quality cues"
+        "studio product photography of a premium automotive brake disc set with brake pads "
+        "arranged on a matte dark-grey surface. Dramatic soft directional lighting from one side, "
+        "polished metal surfaces with realistic micro-reflections, shallow depth of field, "
+        "magazine-editorial automotive product photography"
     ),
     "urgency": (
-        "boxed automotive part on a clean parts counter with a hand reaching for it, "
-        "shallow depth of field, sense of immediacy and same-day availability"
+        "documentary photography of a clean parts counter, a single PLAIN solid-color "
+        "cardboard parts box (no markings) being lifted by a mechanic's hand, shallow depth "
+        "of field, slight motion, real workshop environment"
     ),
     "service": (
-        "skilled mechanic's hands installing a fresh OEM-quality automotive part in a bright "
-        "modern workshop, blue overalls, clean workbench, professional service feel"
+        "documentary photography of a skilled mechanic's hands installing a clean automotive "
+        "part (such as a brake pad or filter) on a vehicle in a bright modern service bay. "
+        "Blue mechanic overalls, real tools on the workbench, natural daylight from the bay door"
     ),
     "value": (
-        "automotive workshop with neatly organised Korean parts on display next to professional "
-        "tools, bright natural lighting, trust and fair-pricing atmosphere"
+        "studio-style product photography of an arrangement of automotive replacement parts — "
+        "a brake disc, an air filter, a brake pad set, and a couple of plain solid-color "
+        "automotive parts boxes (no printed labels) — on a workshop floor with neutral lighting"
     ),
     "safety": (
-        "Korean sedan or hatchback (Hyundai or Kia silhouette, no logos) on a sunlit South African "
-        "road, mountains in distance, sense of confidence and reliability"
+        "documentary photography of a clean Korean-style hatchback or sedan (no badges visible) "
+        "parked under bright South African daylight near a workshop, hood slightly raised showing "
+        "well-maintained engine bay, sense of reliability"
     ),
     "local": (
-        "friendly automotive parts shop counter scene, warm lighting, welcoming atmosphere, "
-        "sense of local community service"
+        "documentary photography of a friendly automotive parts shop counter scene. Two adults in "
+        "casual workshop attire (one customer, one staff) speaking warmly across the counter, "
+        "behind them clean shelving with PLAIN solid-color cardboard parts boxes (no printed text "
+        "or logos), natural shop lighting"
     ),
 }
 
@@ -94,20 +177,26 @@ def build_visual_prompt(
     angle_key = (angle or "local").lower()
     scene = ANGLE_SCENES.get(angle_key, ANGLE_SCENES["local"])
     brands_str = ", ".join(brands[:3]) if brands else "Korean automotive"
-    return (
-        "Professional automotive parts advertisement photograph. "
-        f"Scene: {scene}. "
-        f"Featured brand context: {brands_str} (Korean OEM-equivalent parts), "
-        f"South African market ({branch_city}). "
-        "Style: clean, premium, magazine-quality automotive product photography, "
-        "navy blue and emerald green brand palette (subtle accents only), "
-        "neutral or white background where possible. "
-        "Composition: keep the LOWER THIRD of the frame visually quiet — "
-        "we add headline text and brand logo in post-production. "
-        "ABSOLUTE RULES: do NOT include any text, words, letters, numbers, signage, "
-        "watermarks, fake logos, or labels of any kind in the image. "
-        "No brand names visible. No fake product packaging text."
-    )
+    return f"""PHOTOREALISTIC automotive advertisement photograph. Documentary or studio photography, NEVER illustrated or rendered or 3D-CGI looking.
+
+SUBJECT: {scene}
+
+STRICT VISUAL RULES — these are non-negotiable:
+1. Photorealistic photography only. No illustration, no painting, no 3D render aesthetic.
+2. ZERO text or numbers in the image. No words, no letters, no digits anywhere.
+3. ZERO logos, ZERO brand marks, ZERO printed labels on products or boxes.
+4. ZERO cartoon icons, NO drawn symbols, NO illustrated badges, NO sketched graphics.
+5. Any cardboard boxes shown must be PLAIN SOLID-COLOR cardboard — completely blank surfaces, no print, no graphics, no text whatsoever. Treat boxes like blank product packaging.
+6. Products (brake discs, filters, pads, etc.) must look like real-world OEM-quality automotive parts — clean modern industrial design, not stylised or fantastical.
+7. Lighting must be physically plausible — real shadows, real reflections, no impossible glow.
+8. Composition: keep the LOWER THIRD visually quiet (uncluttered, neutral) — text and logo go there in post-production.
+
+CONTEXTUAL ANCHORS:
+- Market: South African automotive market, {branch_city} workshop / shop environment.
+- Vehicle fitment context: {brands_str}-segment vehicles (Korean compact and mid-size cars).
+- Brand palette accents only (very subtle): navy blue, emerald green.
+
+ANTI-AI-TELL: avoid these common AI artefacts — distorted hands or fingers, garbled fake text, oversized fake logos on boxes, cartoonish painted-on icons, melting parts, impossible reflections, plastic-looking studio backdrop, overly saturated colours, generic stock-photo flatness."""
 
 
 def _call_openai_image(prompt: str, model: str, quality: str) -> bytes:
@@ -198,25 +287,11 @@ def overlay_branding(
 
     draw = ImageDraw.Draw(img)
 
-    # Logo top-left
-    if LOGO_PATH.exists():
+    # Logo top-left — transparent bg + soft white halo, blends on any image
+    logo_block = _prepare_logo(target_height=140)
+    if logo_block is not None:
         try:
-            logo = Image.open(LOGO_PATH).convert("RGBA")
-            target_h = 110
-            ratio = target_h / logo.height
-            logo = logo.resize((int(logo.width * ratio), target_h), Image.LANCZOS)
-            # white pill background for logo readability over any image
-            pad = 16
-            pill = Image.new(
-                "RGBA",
-                (logo.width + 2 * pad, logo.height + 2 * pad),
-                (255, 255, 255, 235),
-            )
-            pmask = Image.new("L", pill.size, 0)
-            pdraw = ImageDraw.Draw(pmask)
-            pdraw.rounded_rectangle([(0, 0), pill.size], radius=20, fill=255)
-            img.paste(pill, (40, 40), pmask)
-            img.paste(logo, (40 + pad, 40 + pad), logo)
+            img.alpha_composite(logo_block, (28, 28))
         except Exception as e:
             log.warning("Logo overlay failed: %s", e)
 

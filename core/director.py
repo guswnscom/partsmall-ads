@@ -66,6 +66,25 @@ Brand voice rules:
 - Prefer: "in stock today", "specialised Korean parts", "OEM-standard quality",
   "WhatsApp us now", "safety-engineered", "globally trusted (70+ countries)"
 
+CRITICAL LEGAL & TRADEMARK RULES (NON-NEGOTIABLE):
+- NEVER write "Genuine Hyundai parts", "Genuine Kia parts", or "Genuine [brand] parts".
+  The word "Genuine" on its own implies OEM-authentic parts — we sell OEM-equivalent /
+  OEM-standard quality, NOT necessarily original-OEM. Using "Genuine" alone is a
+  trademark and false-advertising risk in South Africa.
+- ALWAYS use one of these legally-safe phrasings instead:
+    "Genuine quality" (qualifying quality, not authenticity)
+    "OEM-standard quality"
+    "OEM-equivalent quality"
+    "PMC quality" (our parent brand)
+    "Specialised Korean parts"
+- Never claim our parts are "made by Hyundai/Kia/Chevrolet/Suzuki/Ssangyong".
+  We are a SPECIALISED DISTRIBUTOR of parts that FIT those brands.
+- Brand names (Hyundai, Kia, etc.) may appear ONLY as fitment context
+  (e.g. "parts for your Hyundai i20", "Kia Sportage parts in stock"),
+  never as the source of our parts.
+- Avoid words that imply official endorsement: "Authorised", "Certified by",
+  "Approved by [brand]" (unless legally true and verified).
+
 Service / maintenance angle — IMPORTANT pattern to include:
 Some variants must speak to drivers who are due for service. Example phrasings:
   - "Missed your service? OEM-standard parts ready today."
@@ -226,10 +245,14 @@ Recent ad copy already generated (last 30 days — DO NOT repeat phrasing or ang
 
 Generate exactly {n_variants} distinct Meta ad variants. Cover ALL of these audiences/angles:
 1. WORKSHOP B2B — stock/account focus ("we keep your bays moving")
-2. DRIVER B2C — trust / OEM-standard quality / "globally trusted in 70+ countries"
+2. DRIVER B2C — trust / **Genuine quality** / OEM-standard / "globally trusted in 70+ countries"
 3. DRIVER B2C — SERVICE reminder ("Missed your service? OEM-standard parts ready today, WhatsApp us")
 4. WORKSHOP B2B — fair pricing / fast pickup / no dealer markup
 5. UNIVERSAL — local + WhatsApp + safety-engineered Korean parts
+
+⚠️ Trademark check before each variant: "Did I write 'Genuine [brand]' or 'Genuine
+parts' in a way that implies OEM-authentic?" If yes, REWRITE using "Genuine quality",
+"OEM-standard quality", or "Specialised Korean parts" instead.
 
 For variant #3 specifically, lean on the service/maintenance angle — a customer overdue
 for service should feel "I should sort this out today, with parts I can trust." Use

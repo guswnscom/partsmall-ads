@@ -26,6 +26,23 @@
 - ❌ "Buy now!" 같은 직접 판매 (우리는 WhatsApp 으로 상담 → 견적)
 - ❌ Bushy English / 어색한 직역
 
+## ⚠️ 법적/상표 금지어 (절대 NO)
+
+- ❌ "**Genuine Hyundai parts**" / "Genuine Kia parts" / "Genuine [브랜드] parts"
+  - 이유: OEM 정품을 판매하는 것처럼 오해 → 허위광고 + 상표권 위반 위험
+  - SA Hyundai/Kia 가 클레임 가능
+- ❌ "**Authorised by Hyundai**" / "Approved by Kia" / "Certified by [브랜드]"
+- ❌ "Made by Hyundai" 등 출처 오인 표현
+- ❌ 단독 "Genuine" (수식어 없이)
+
+### 대신 써야 할 안전한 표현
+
+- ✅ "**Genuine quality**" — 품질을 지칭, 정품성 X
+- ✅ "**OEM-standard quality**" / "**OEM-equivalent**"
+- ✅ "**PMC quality**" (모회사 브랜드, 70+ countries 강조 OK)
+- ✅ "**Specialised Korean parts**"
+- ✅ "**Parts for your Hyundai i20**" (fitment 표현 — 브랜드는 적합 차종으로만)
+
 ## 페이스북 본사 페이지 (참고)
 
 https://www.facebook.com/PartsMallSA/
