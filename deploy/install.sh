@@ -113,14 +113,23 @@ install_systemd() {
 
 install_caddy() {
     echo "==> Installing Caddyfile"
-    cp "${APP_DIR}/deploy/Caddyfile" /etc/caddy/Caddyfile
+    # Don't overwrite an already-customized Caddyfile (e.g. one with a real admin hash).
+    # Only deploy the template if /etc/caddy/Caddyfile is missing OR still has the placeholder.
+    if [[ ! -f /etc/caddy/Caddyfile ]] || grep -q "REPLACE_ME_WITH_REAL_HASH" /etc/caddy/Caddyfile; then
+        cp "${APP_DIR}/deploy/Caddyfile" /etc/caddy/Caddyfile
+        echo "  (deployed fresh Caddyfile from template)"
+    else
+        echo "  (kept existing Caddyfile — it has a real admin hash)"
+    fi
+
     if grep -q "REPLACE_ME_WITH_REAL_HASH" /etc/caddy/Caddyfile; then
         echo ""
         echo "  >>> Caddyfile still has placeholder admin password hash."
-        echo "      Generate a hash with:"
-        echo "          caddy hash-password"
-        echo "      Then edit /etc/caddy/Caddyfile, replace the \$2a\$14\$REPLACE_ME_WITH_REAL_HASH line, and run:"
-        echo "          systemctl reload caddy"
+        echo "      Set it with the one-liner below:"
+        echo "        read -s -p 'Admin pw: ' PW; echo"
+        echo "        export HASH=\$(caddy hash-password --plaintext \"\$PW\"); unset PW"
+        echo "        perl -pi -e 's|\\\$2a\\\$14\\\$REPLACE_ME_WITH_REAL_HASH|\$ENV{HASH}|g' /etc/caddy/Caddyfile"
+        echo "        unset HASH && systemctl reload caddy"
         echo ""
     fi
 }
