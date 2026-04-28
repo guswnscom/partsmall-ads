@@ -34,16 +34,84 @@ log = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent.parent
 ASSETS_DIR = ROOT / "assets"
 GENERATED_DIR = ROOT / "generated"
+REF_IMAGES_DIR = ROOT / "reference" / "images"
 GENERATED_DIR.mkdir(exist_ok=True)
 
-# Prefer the OFFICIAL DISTRIBUTOR variant if present, else fall back to plain logo.
-LOGO_OFFICIAL_PATH = ASSETS_DIR / "logo-official.png"
-LOGO_PATH = ASSETS_DIR / "logo.png"
+# Brand → model keyword mapping for matching reference images by filename.
+# When user drops e.g. `i20.jpg` or `kia_sportage.png` in reference/images/,
+# we pick those up automatically when the campaign features that brand.
+BRAND_MODEL_KEYWORDS: Dict[str, list[str]] = {
+    "hyundai": [
+        "hyundai", "i10", "i20", "i30", "i40", "tucson", "sonata", "elantra",
+        "creta", "santafe", "santa-fe", "santa_fe", "kona", "venue",
+        "atos", "atoz",
+        "accent", "getz", "ix35", "veloster", "grand",
+        "h1", "h-1", "h_1", "h100", "h-100", "h_100", "h350",
+        "starex", "trajet", "matrix", "lavita", "azera", "genesis",
+    ],
+    "kia": [
+        "kia", "picanto", "rio", "sportage", "cerato", "soul", "sorento",
+        "seltos", "stonic", "spectra", "sedona", "carnival", "k2700",
+        "k2500", "k2900", "optima", "pride", "carens", "venga", "pregio",
+    ],
+    "chevrolet": [
+        "chevrolet", "chevy", "spark", "aveo", "sonic", "trax", "captiva",
+        "cruze", "lumina", "utility", "optra", "lacetti",
+    ],
+    "suzuki": [
+        "suzuki", "swift", "baleno", "celerio", "ertiga", "jimny",
+        "vitara", "s-presso", "spresso", "ignis", "alto",
+    ],
+    "ssangyong": [
+        "ssangyong", "tivoli", "korando", "rexton", "musso", "actyon", "stavic",
+    ],
+}
+
+MAX_REF_IMAGES_PER_GEN = 2  # don't overload the prompt — pick top 2
+
+# Logo file resolution — tolerant of multiple filenames so the user can drop
+# any reasonably-named logo into assets/ without fiddling with extensions/case.
+LOGO_PATH = ASSETS_DIR / "logo.png"  # final fallback (the plain logo)
+ALLOWED_LOGO_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 def _resolve_logo_path() -> Optional[Path]:
-    if LOGO_OFFICIAL_PATH.exists():
-        return LOGO_OFFICIAL_PATH
+    """Find the best logo file in assets/.
+
+    Priority order:
+      1. assets/logo-official.{png,jpg,jpeg,webp}  (explicit OFFICIAL DISTRIBUTOR variant)
+      2. assets/logo_official.* (underscore alternative)
+      3. Any file in assets/ whose stem CONTAINS 'official' (case-insensitive)
+      4. Any file in assets/ whose stem CONTAINS 'parts-mall' (case-insensitive),
+         excluding the plain logo.png
+      5. assets/logo.png (final fallback)
+    """
+    if not ASSETS_DIR.exists():
+        return None
+
+    # 1 + 2: explicit names with allowed extensions
+    for stem in ("logo-official", "logo_official"):
+        for ext in ALLOWED_LOGO_EXTS:
+            p = ASSETS_DIR / f"{stem}{ext}"
+            if p.exists():
+                return p
+
+    # 3: any file with "official" in its name
+    for p in sorted(ASSETS_DIR.iterdir()):
+        if not p.is_file() or p.suffix.lower() not in ALLOWED_LOGO_EXTS:
+            continue
+        if "official" in p.stem.lower():
+            return p
+
+    # 4: any "PARTS-MALL ..." file (the user may have saved with the brand name)
+    for p in sorted(ASSETS_DIR.iterdir()):
+        if not p.is_file() or p.suffix.lower() not in ALLOWED_LOGO_EXTS:
+            continue
+        if "parts-mall" in p.stem.lower() or "partsmall" in p.stem.lower():
+            if p.name.lower() != "logo.png":
+                return p
+
+    # 5: final fallback
     if LOGO_PATH.exists():
         return LOGO_PATH
     return None
@@ -169,15 +237,69 @@ def is_enabled() -> bool:
     return bool(os.getenv("OPENAI_API_KEY"))
 
 
+def _find_reference_vehicle_images(
+    brands: list[str], max_n: int = MAX_REF_IMAGES_PER_GEN
+) -> list[Path]:
+    """Pick reference images from reference/images/ that match the campaign's brands.
+
+    Matches filenames against BRAND_MODEL_KEYWORDS. Returns up to max_n paths,
+    randomized so different generations get different reference angles.
+    """
+    if not REF_IMAGES_DIR.exists():
+        return []
+
+    keywords: set[str] = set()
+    for b in brands:
+        keywords.update(BRAND_MODEL_KEYWORDS.get(b.lower(), [b.lower()]))
+
+    # Recursive: also pick up files inside language-named subfolders
+    # (e.g. user organised by Korean folder names like 차량사진/, 광고이미지/)
+    all_imgs: list[Path] = []
+    for p in sorted(REF_IMAGES_DIR.rglob("*")):
+        if p.is_file() and p.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
+            all_imgs.append(p)
+
+    # Match by stem keywords against brands
+    matches: list[Path] = []
+    for p in all_imgs:
+        name = p.stem.lower().replace(" ", "").replace("_", "").replace("-", "")
+        kw_norm = [k.replace(" ", "").replace("_", "").replace("-", "") for k in keywords]
+        if any(k and k in name for k in kw_norm):
+            matches.append(p)
+
+    if not matches:
+        # Fallback: any image gives the model some brand visual context
+        matches = all_imgs
+
+    import random
+    random.shuffle(matches)
+    return matches[:max_n]
+
+
 def build_visual_prompt(
     angle: str,
     brands: list[str],
     branch_city: str,
+    has_references: bool = False,
 ) -> str:
     angle_key = (angle or "local").lower()
     scene = ANGLE_SCENES.get(angle_key, ANGLE_SCENES["local"])
     brands_str = ", ".join(brands[:3]) if brands else "Korean automotive"
-    return f"""PHOTOREALISTIC automotive advertisement photograph. Documentary or studio photography, NEVER illustrated or rendered or 3D-CGI looking.
+
+    refs_block = ""
+    if has_references:
+        refs_block = """
+
+REFERENCE IMAGES (provided alongside this prompt):
+The attached image(s) show the SPECIFIC vehicle model(s) this campaign targets.
+Use them as VISUAL CONTEXT — match the body style, proportions, colour, and
+era of the vehicle when a vehicle appears in your generated scene.
+Do NOT copy the reference photo's composition or background. The reference
+is purely for vehicle identification — your output is a NEW advertising
+scene per the SUBJECT description above. If the reference shows a partial
+view (e.g. front grille only), still infer the rest of the vehicle from it."""
+
+    return f"""PHOTOREALISTIC automotive advertisement photograph. Documentary or studio photography, NEVER illustrated or rendered or 3D-CGI looking.{refs_block}
 
 SUBJECT: {scene}
 
@@ -222,6 +344,49 @@ def _call_openai_image(prompt: str, model: str, quality: str) -> bytes:
         quality=quality if quality in ("low", "medium", "high") else "medium",
         n=1,
     )
+    return base64.b64decode(resp.data[0].b64_json)
+
+
+def _call_openai_image_with_refs(
+    prompt: str,
+    model: str,
+    quality: str,
+    reference_paths: list[Path],
+) -> bytes:
+    """Use gpt-image-1's edit endpoint with multiple reference images.
+
+    The model treats these as visual context (vehicle look, brand feel) and
+    generates a new ad-style image guided by the prompt.
+
+    Note: only gpt-image-1 supports multi-image input. dall-e-3 falls back to
+    text-only generation.
+    """
+    if model != "gpt-image-1":
+        log.info("Refs supplied but model=%s doesn't support multi-image edit — falling back to text-only.", model)
+        return _call_openai_image(prompt, model, quality)
+
+    from openai import OpenAI  # lazy import
+    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
+    files = []
+    try:
+        for p in reference_paths:
+            files.append(open(p, "rb"))
+        resp = client.images.edit(
+            model="gpt-image-1",
+            image=files,
+            prompt=prompt,
+            size="1024x1024",
+            quality=quality if quality in ("low", "medium", "high") else "high",
+            n=1,
+        )
+    finally:
+        for f in files:
+            try:
+                f.close()
+            except Exception:
+                pass
+
     return base64.b64decode(resp.data[0].b64_json)
 
 
@@ -377,19 +542,32 @@ def generate_poster_for_variant(creative_id: int) -> Optional[str]:
             return None
 
     brands = json.loads(camp["brands"])
-    prompt = build_visual_prompt(c["angle"] or "local", brands, branch["city"])
+
+    # Find brand-matched reference images (e.g. i20.jpg, sportage.png)
+    refs = _find_reference_vehicle_images(brands)
+
+    prompt = build_visual_prompt(
+        c["angle"] or "local",
+        brands,
+        branch["city"],
+        has_references=bool(refs),
+    )
 
     model = os.getenv("OPENAI_IMAGE_MODEL", DEFAULT_MODEL)
     quality = os.getenv("OPENAI_IMAGE_QUALITY", DEFAULT_QUALITY)
     if model == "dall-e-3":
-        quality = "standard"
+        quality = "hd"
 
     log.info(
-        "AssetGen: variant #%s (angle=%s, model=%s, quality=%s)",
-        creative_id, c["angle"], model, quality,
+        "AssetGen: variant #%s (angle=%s, model=%s, quality=%s, refs=%d) [%s]",
+        creative_id, c["angle"], model, quality, len(refs),
+        ", ".join(p.name for p in refs) if refs else "no refs",
     )
     try:
-        base = _call_openai_image(prompt, model, quality)
+        if refs:
+            base = _call_openai_image_with_refs(prompt, model, quality, refs)
+        else:
+            base = _call_openai_image(prompt, model, quality)
     except Exception as e:
         log.error("OpenAI image API failed: %s", e)
         return None
