@@ -1,0 +1,20 @@
+[Unit]
+Description=PARTS-MALL Director Agent — daily ad copy generation
+After=network.target
+
+[Service]
+Type=oneshot
+User=partsmall
+Group=partsmall
+WorkingDirectory=/opt/partsmall
+EnvironmentFile=/opt/partsmall/.env
+Environment=HOME=/opt/partsmall
+ExecStart=/opt/partsmall/.venv/bin/python -m core.cron_director
+StandardOutput=journal
+StandardError=journal
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/partsmall/data /opt/partsmall/uploads /opt/partsmall/generated

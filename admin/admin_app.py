@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT))
 
 from core.db import db, init_db  # noqa: E402
 from core.seed import seed       # noqa: E402
+from core.director import generate_and_save  # noqa: E402
 
 UPLOADS = ROOT / "uploads"
 UPLOADS.mkdir(exist_ok=True)
@@ -147,7 +148,7 @@ def page_campaigns():
                 if r["notes"]:
                     st.caption(f"Notes: {r['notes']}")
 
-                action_cols = st.columns(3)
+                action_cols = st.columns(4)
                 with action_cols[0]:
                     if st.button("Approve", key=f"a{r['id']}"):
                         with db() as conn:
@@ -172,6 +173,72 @@ def page_campaigns():
                                 (r["id"],),
                             )
                         st.rerun()
+                with action_cols[3]:
+                    if st.button("🪄 Generate Copy", key=f"g{r['id']}",
+                                 help="Director Agent generates 5 English ad variants"):
+                        try:
+                            with st.spinner("Director is writing ad copy..."):
+                                n = generate_and_save(r["id"])
+                            st.success(f"Saved {n} variants. Scroll to **Ad Creatives** below.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Generation failed: {e}")
+
+            # Show generated creatives for this campaign
+            with db() as conn:
+                creatives = conn.execute(
+                    """SELECT * FROM ad_creatives
+                       WHERE campaign_id = ?
+                       ORDER BY created_at DESC""",
+                    (r["id"],),
+                ).fetchall()
+            if creatives:
+                st.markdown("---")
+                st.markdown("### 🎨 Ad Creatives")
+                for c in creatives:
+                    badge = "✅ Approved" if c["approved"] else (
+                        "❌ Rejected" if c["rejected_at"] else "⏳ Pending"
+                    )
+                    st.markdown(
+                        f"**Variant #{c['id']}** · {badge} · "
+                        f"audience: `{c['audience']}` · angle: `{c['angle']}`"
+                    )
+                    st.markdown(f"**Headline:** {c['headline']}")
+                    st.markdown(f"**Primary text:** {c['primary_text']}")
+                    st.caption(
+                        f"CTA: {c['cta']}  ·  Tags: "
+                        f"{', '.join(json.loads(c['hashtags'] or '[]'))}"
+                    )
+                    st.code(c["landing_url"] or "", language=None)
+                    btns = st.columns(3)
+                    with btns[0]:
+                        if not c["approved"] and st.button("Approve", key=f"ac_a{c['id']}"):
+                            with db() as conn:
+                                conn.execute(
+                                    """UPDATE ad_creatives
+                                       SET approved=1, approved_at=?, rejected_at=NULL
+                                       WHERE id=?""",
+                                    (datetime.utcnow().isoformat(), c["id"]),
+                                )
+                            st.rerun()
+                    with btns[1]:
+                        if not c["rejected_at"] and st.button("Reject", key=f"ac_r{c['id']}"):
+                            with db() as conn:
+                                conn.execute(
+                                    """UPDATE ad_creatives
+                                       SET approved=0, rejected_at=?
+                                       WHERE id=?""",
+                                    (datetime.utcnow().isoformat(), c["id"]),
+                                )
+                            st.rerun()
+                    with btns[2]:
+                        if st.button("Delete", key=f"ac_d{c['id']}"):
+                            with db() as conn:
+                                conn.execute(
+                                    "DELETE FROM ad_creatives WHERE id=?", (c["id"],)
+                                )
+                            st.rerun()
+                    st.markdown("---")
 
 
 def page_staff():

@@ -59,13 +59,18 @@ CREATE TABLE IF NOT EXISTS ad_creatives (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     campaign_id     INTEGER NOT NULL REFERENCES campaigns(id),
     platform        TEXT NOT NULL,           -- 'meta' | 'google' | 'tiktok'
+    audience        TEXT,                    -- 'workshop' | 'driver' | 'both'
+    angle           TEXT,                    -- 'stock' | 'trust' | 'urgency' | 'value' | 'local'
     headline        TEXT,
     primary_text    TEXT,
     cta             TEXT,                    -- e.g. 'Send WhatsApp'
+    hashtags        TEXT,                    -- JSON array
     asset_path      TEXT,                    -- watermarked poster
     landing_url     TEXT,                    -- per-region landing
     generated_by    TEXT,                    -- 'director_agent' | 'manual'
     approved        INTEGER DEFAULT 0,
+    rejected_at     TEXT,
+    approved_at     TEXT,
     created_at      TEXT NOT NULL
 );
 
@@ -127,6 +132,11 @@ def init_db() -> None:
         for col in ("address", "landline"):
             if col not in bcols:
                 conn.execute(f"ALTER TABLE branches ADD COLUMN {col} TEXT")
+        # ad_creatives: director-agent metadata columns (added 2026-04)
+        accols = [r["name"] for r in conn.execute("PRAGMA table_info(ad_creatives)")]
+        for col in ("audience", "angle", "hashtags", "rejected_at", "approved_at"):
+            if col not in accols:
+                conn.execute(f"ALTER TABLE ad_creatives ADD COLUMN {col} TEXT")
 
 
 if __name__ == "__main__":

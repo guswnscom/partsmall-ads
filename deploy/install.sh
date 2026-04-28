@@ -104,8 +104,11 @@ install_systemd() {
     echo "==> Installing systemd unit files"
     cp "${APP_DIR}/deploy/partsmall-landing.service" /etc/systemd/system/
     cp "${APP_DIR}/deploy/partsmall-admin.service" /etc/systemd/system/
+    cp "${APP_DIR}/deploy/director-daily.service" /etc/systemd/system/
+    cp "${APP_DIR}/deploy/director-daily.timer" /etc/systemd/system/
     systemctl daemon-reload
-    systemctl enable partsmall-landing partsmall-admin
+    systemctl enable partsmall-landing partsmall-admin director-daily.timer
+    systemctl start director-daily.timer
 }
 
 install_caddy() {

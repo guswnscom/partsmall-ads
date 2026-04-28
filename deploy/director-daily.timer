@@ -1,0 +1,11 @@
+[Unit]
+Description=Run PARTS-MALL Director Agent daily at 06:00 SAST
+
+[Timer]
+# 06:00 SAST = 04:00 UTC
+OnCalendar=*-*-* 04:00:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
