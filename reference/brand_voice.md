@@ -36,7 +36,11 @@ https://www.facebook.com/PartsMallSA/
 
 ## 과거 광고/포스트 예시
 
-(여기에 잘 됐던 페이스북 글 복사 붙여넣기)
+(Engineered for maximum safety and superior braking performance, PMC from Parts-Mall offers a premium range of brake pads, shoes, drums, and discs specifically designed for enhanced wear resistance in Korean-manufactured vehicles.
+
+Technically superior and globally trusted, our PMC parts are now exported to more than 70 countries.
+
+Prioritise your safety and purchase high-performance brake pads, shoes, drums, and discs from Parts-Mall)
 
 ### 예시 1
 ```

@@ -134,7 +134,16 @@ def init_db() -> None:
                 conn.execute(f"ALTER TABLE branches ADD COLUMN {col} TEXT")
         # ad_creatives: director-agent metadata columns (added 2026-04)
         accols = [r["name"] for r in conn.execute("PRAGMA table_info(ad_creatives)")]
-        for col in ("audience", "angle", "hashtags", "rejected_at", "approved_at"):
+        for col in (
+            "audience",
+            "angle",
+            "hashtags",
+            "rejected_at",
+            "approved_at",
+            "live_at",       # currently running as a live ad
+            "paused_at",     # paused after going live
+            "platforms",     # JSON array, where it's currently shown e.g. ["meta_fb","meta_ig"]
+        ):
             if col not in accols:
                 conn.execute(f"ALTER TABLE ad_creatives ADD COLUMN {col} TEXT")
 

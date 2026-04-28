@@ -113,6 +113,51 @@ def page_upload():
         st.success(f"Campaign #{cur.lastrowid} saved. Director Agent will draft platform copy on next run.")
 
 
+def _campaign_click_summary(campaign_id: int):
+    """Return aggregated click stats for a campaign (total + per-variant)."""
+    now = datetime.utcnow()
+    cutoffs = {
+        "24h": (now - timedelta(hours=24)).isoformat(),
+        "7d":  (now - timedelta(days=7)).isoformat(),
+        "30d": (now - timedelta(days=30)).isoformat(),
+    }
+    with db() as conn:
+        totals = {}
+        for k, since in cutoffs.items():
+            row = conn.execute(
+                "SELECT COUNT(*) AS n FROM click_logs WHERE campaign_id = ? AND clicked_at >= ?",
+                (campaign_id, since),
+            ).fetchone()
+            totals[k] = row["n"] if row else 0
+        # per-variant clicks via utm_campaign matching
+        per_variant = conn.execute(
+            """SELECT utm_campaign, COUNT(*) AS clicks, MAX(clicked_at) AS last_click
+               FROM click_logs WHERE campaign_id = ?
+               GROUP BY utm_campaign ORDER BY clicks DESC""",
+            (campaign_id,),
+        ).fetchall()
+    return totals, per_variant
+
+
+def _variant_clicks(campaign_id: int, utm_campaign: str):
+    """Click count + last click timestamp for one variant."""
+    with db() as conn:
+        row = conn.execute(
+            """SELECT COUNT(*) AS n, MAX(clicked_at) AS last_at
+               FROM click_logs WHERE campaign_id = ? AND utm_campaign = ?""",
+            (campaign_id, utm_campaign),
+        ).fetchone()
+    return (row["n"] if row else 0, row["last_at"] if row else None)
+
+
+def _utm_from_landing_url(url: str) -> str:
+    """Extract utm_campaign from a landing URL string."""
+    if not url or "utm_campaign=" not in url:
+        return ""
+    tail = url.split("utm_campaign=", 1)[1]
+    return tail.split("&", 1)[0]
+
+
 def page_campaigns():
     st.header("📋 Campaigns")
     status_filter = st.selectbox(
@@ -132,7 +177,27 @@ def page_campaigns():
         return
 
     for r in rows:
-        with st.expander(f"#{r['id']} · {r['title']} · {r['status']}"):
+        # Pre-compute lightweight stats so the expander label can show live count
+        with db() as conn:
+            live_count = conn.execute(
+                """SELECT COUNT(*) AS n FROM ad_creatives
+                   WHERE campaign_id = ? AND approved = 1 AND live_at IS NOT NULL
+                     AND paused_at IS NULL""",
+                (r["id"],),
+            ).fetchone()["n"]
+            approved_count = conn.execute(
+                """SELECT COUNT(*) AS n FROM ad_creatives
+                   WHERE campaign_id = ? AND approved = 1""",
+                (r["id"],),
+            ).fetchone()["n"]
+        live_badge = (
+            f" · 🟢 {live_count} live"
+            if live_count
+            else (f" · ✅ {approved_count} approved" if approved_count else "")
+        )
+        with st.expander(
+            f"#{r['id']} · {r['title']} · {r['status']}{live_badge}"
+        ):
             cols = st.columns([1, 2])
             with cols[0]:
                 poster = ROOT / r["poster_path"]
@@ -184,35 +249,97 @@ def page_campaigns():
                         except Exception as e:
                             st.error(f"Generation failed: {e}")
 
-            # Show generated creatives for this campaign
+            # Live performance summary (only if any creatives exist)
             with db() as conn:
                 creatives = conn.execute(
                     """SELECT * FROM ad_creatives
                        WHERE campaign_id = ?
-                       ORDER BY created_at DESC""",
+                       ORDER BY
+                         CASE WHEN approved = 1 AND live_at IS NOT NULL AND paused_at IS NULL THEN 0
+                              WHEN approved = 1 THEN 1
+                              WHEN rejected_at IS NULL THEN 2
+                              ELSE 3 END,
+                         created_at DESC""",
                     (r["id"],),
                 ).fetchall()
+
             if creatives:
+                totals, per_variant = _campaign_click_summary(r["id"])
+                st.markdown("---")
+                st.markdown("### 📈 Live Performance")
+                m = st.columns(4)
+                m[0].metric("Approved variants", approved_count)
+                m[1].metric("Live now", live_count)
+                m[2].metric("Clicks (24 h)", totals["24h"])
+                m[3].metric("Clicks (7 d)", totals["7d"])
+                if totals["7d"] == 0:
+                    st.caption(
+                        "No clicks tracked yet. Once a variant is **live** on Meta and "
+                        "the ad runs with the variant's landing URL, redirects show up here."
+                    )
+
                 st.markdown("---")
                 st.markdown("### 🎨 Ad Creatives")
                 for c in creatives:
-                    badge = "✅ Approved" if c["approved"] else (
-                        "❌ Rejected" if c["rejected_at"] else "⏳ Pending"
+                    if c["approved"] and c["live_at"] and not c["paused_at"]:
+                        badge = "🟢 LIVE"
+                    elif c["paused_at"]:
+                        badge = "⏸ Paused"
+                    elif c["approved"]:
+                        badge = "✅ Approved"
+                    elif c["rejected_at"]:
+                        badge = "❌ Rejected"
+                    else:
+                        badge = "⏳ Pending"
+
+                    utm = _utm_from_landing_url(c["landing_url"] or "")
+                    v_clicks, v_last = _variant_clicks(r["id"], utm)
+
+                    platforms = json.loads(c["platforms"] or "[]") or ["meta_fb", "meta_ig"]
+                    platforms_str = ", ".join(
+                        {"meta_fb": "Facebook", "meta_ig": "Instagram",
+                         "google": "Google", "tiktok": "TikTok"}.get(p, p)
+                        for p in platforms
                     )
+
                     st.markdown(
-                        f"**Variant #{c['id']}** · {badge} · "
-                        f"audience: `{c['audience']}` · angle: `{c['angle']}`"
+                        f"**Variant #{c['id']}** · {badge}  ·  "
+                        f"audience `{c['audience']}` · angle `{c['angle']}`"
                     )
-                    st.markdown(f"**Headline:** {c['headline']}")
-                    st.markdown(f"**Primary text:** {c['primary_text']}")
+
+                    pcols = st.columns([2, 1])
+                    with pcols[0]:
+                        # Ad preview card
+                        st.markdown(
+                            f"""<div style='border:1px solid #e5e7eb;border-radius:8px;padding:12px;background:#f9fafb;'>
+<div style='font-size:12px;color:#6b7280;margin-bottom:6px;'>Sponsored · PARTS-MALL</div>
+<div style='font-weight:700;font-size:16px;margin-bottom:6px;'>{(c['headline'] or '').replace('<','&lt;')}</div>
+<div style='font-size:14px;margin-bottom:10px;'>{(c['primary_text'] or '').replace('<','&lt;')}</div>
+<div style='display:inline-block;padding:6px 14px;background:#25D366;color:white;border-radius:6px;font-weight:600;font-size:13px;'>{c['cta'] or 'Send WhatsApp'}</div>
+</div>""",
+                            unsafe_allow_html=True,
+                        )
+                    with pcols[1]:
+                        st.metric("Clicks", v_clicks)
+                        if v_last:
+                            st.caption(f"Last click: {v_last[:19]} UTC")
+                        else:
+                            st.caption("No clicks yet")
+                        st.caption(f"On: **{platforms_str}**")
+
                     st.caption(
-                        f"CTA: {c['cta']}  ·  Tags: "
-                        f"{', '.join(json.loads(c['hashtags'] or '[]'))}"
+                        f"Tags: {', '.join(json.loads(c['hashtags'] or '[]'))}  ·  "
+                        f"CTA URL ↓"
                     )
                     st.code(c["landing_url"] or "", language=None)
-                    btns = st.columns(3)
+
+                    # Action buttons
+                    btns = st.columns(5)
+                    is_live = bool(c["approved"] and c["live_at"] and not c["paused_at"])
+                    is_approved = bool(c["approved"])
+
                     with btns[0]:
-                        if not c["approved"] and st.button("Approve", key=f"ac_a{c['id']}"):
+                        if not is_approved and st.button("Approve", key=f"ac_a{c['id']}"):
                             with db() as conn:
                                 conn.execute(
                                     """UPDATE ad_creatives
@@ -222,16 +349,40 @@ def page_campaigns():
                                 )
                             st.rerun()
                     with btns[1]:
-                        if not c["rejected_at"] and st.button("Reject", key=f"ac_r{c['id']}"):
+                        if is_approved and not is_live and st.button(
+                            "🟢 Mark Live", key=f"ac_live{c['id']}",
+                            help="Set this when you've posted the ad on Meta"
+                        ):
                             with db() as conn:
                                 conn.execute(
                                     """UPDATE ad_creatives
-                                       SET approved=0, rejected_at=?
+                                       SET live_at=?, paused_at=NULL
                                        WHERE id=?""",
                                     (datetime.utcnow().isoformat(), c["id"]),
                                 )
                             st.rerun()
                     with btns[2]:
+                        if is_live and st.button(
+                            "⏸ Pause", key=f"ac_pause{c['id']}",
+                            help="Manual pause — set when you pause it on Meta"
+                        ):
+                            with db() as conn:
+                                conn.execute(
+                                    "UPDATE ad_creatives SET paused_at=? WHERE id=?",
+                                    (datetime.utcnow().isoformat(), c["id"]),
+                                )
+                            st.rerun()
+                    with btns[3]:
+                        if not c["rejected_at"] and st.button("Reject", key=f"ac_r{c['id']}"):
+                            with db() as conn:
+                                conn.execute(
+                                    """UPDATE ad_creatives
+                                       SET approved=0, rejected_at=?, live_at=NULL, paused_at=NULL
+                                       WHERE id=?""",
+                                    (datetime.utcnow().isoformat(), c["id"]),
+                                )
+                            st.rerun()
+                    with btns[4]:
                         if st.button("Delete", key=f"ac_d{c['id']}"):
                             with db() as conn:
                                 conn.execute(
