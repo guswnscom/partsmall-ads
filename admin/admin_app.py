@@ -24,6 +24,7 @@ sys.path.insert(0, str(ROOT))
 from core.db import db, init_db  # noqa: E402
 from core.seed import seed       # noqa: E402
 from core.director import generate_and_save  # noqa: E402
+from core.asset_generator import generate_poster_for_variant, is_enabled as poster_enabled  # noqa: E402
 
 UPLOADS = ROOT / "uploads"
 UPLOADS.mkdir(exist_ok=True)
@@ -307,25 +308,68 @@ def page_campaigns():
                         f"audience `{c['audience']}` · angle `{c['angle']}`"
                     )
 
-                    pcols = st.columns([2, 1])
+                    pcols = st.columns([1, 1, 1])
                     with pcols[0]:
-                        # Ad preview card
+                        # AI-generated poster preview (if exists)
+                        if c["asset_path"]:
+                            poster_path = ROOT / c["asset_path"]
+                            if poster_path.exists():
+                                st.image(str(poster_path), use_container_width=True)
+                            else:
+                                st.caption("Poster file missing on disk")
+                        else:
+                            st.caption("No poster yet")
+                            if poster_enabled():
+                                if st.button(
+                                    "🎨 Generate Poster (~$0.04)",
+                                    key=f"ac_poster{c['id']}",
+                                    help="AI generates a unique poster image for this variant"
+                                ):
+                                    try:
+                                        with st.spinner("Generating poster (15-30 sec)..."):
+                                            path = generate_poster_for_variant(c["id"])
+                                        if path:
+                                            st.success("Poster ready ✅")
+                                            st.rerun()
+                                        else:
+                                            st.error("Generation returned empty — check logs")
+                                    except Exception as e:
+                                        st.error(f"Failed: {e}")
+                            else:
+                                st.caption("OPENAI_API_KEY not set — poster gen disabled")
+                    with pcols[1]:
+                        # Ad copy preview card — explicit colors so it works in both
+                        # light and dark Streamlit themes
                         st.markdown(
-                            f"""<div style='border:1px solid #e5e7eb;border-radius:8px;padding:12px;background:#f9fafb;'>
+                            f"""<div style='border:1px solid #e5e7eb;border-radius:8px;padding:12px;background:#ffffff;height:100%;color:#1f2937;'>
 <div style='font-size:12px;color:#6b7280;margin-bottom:6px;'>Sponsored · PARTS-MALL</div>
-<div style='font-weight:700;font-size:16px;margin-bottom:6px;'>{(c['headline'] or '').replace('<','&lt;')}</div>
-<div style='font-size:14px;margin-bottom:10px;'>{(c['primary_text'] or '').replace('<','&lt;')}</div>
-<div style='display:inline-block;padding:6px 14px;background:#25D366;color:white;border-radius:6px;font-weight:600;font-size:13px;'>{c['cta'] or 'Send WhatsApp'}</div>
+<div style='font-weight:700;font-size:16px;margin-bottom:6px;color:#1e3a8a;'>{(c['headline'] or '(no headline)').replace('<','&lt;')}</div>
+<div style='font-size:14px;margin-bottom:10px;color:#1f2937;'>{(c['primary_text'] or '').replace('<','&lt;')}</div>
+<div style='display:inline-block;padding:6px 14px;background:#25D366;color:#ffffff;border-radius:6px;font-weight:600;font-size:13px;'>{c['cta'] or 'Send WhatsApp'}</div>
 </div>""",
                             unsafe_allow_html=True,
                         )
-                    with pcols[1]:
+                    with pcols[2]:
                         st.metric("Clicks", v_clicks)
                         if v_last:
                             st.caption(f"Last click: {v_last[:19]} UTC")
                         else:
                             st.caption("No clicks yet")
                         st.caption(f"On: **{platforms_str}**")
+                        if c["asset_path"] and poster_enabled():
+                            if st.button(
+                                "🔄 Regenerate Poster",
+                                key=f"ac_repost{c['id']}",
+                                help="Replace current poster with a new AI generation (~$0.04)"
+                            ):
+                                try:
+                                    with st.spinner("Regenerating..."):
+                                        path = generate_poster_for_variant(c["id"])
+                                    if path:
+                                        st.success("New poster ready")
+                                        st.rerun()
+                                except Exception as e:
+                                    st.error(f"Failed: {e}")
 
                     st.caption(
                         f"Tags: {', '.join(json.loads(c['hashtags'] or '[]'))}  ·  "

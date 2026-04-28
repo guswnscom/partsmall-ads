@@ -99,6 +99,17 @@ def serve_photo(token: str):
     return FileResponse(fp)
 
 
+@app.get("/asset/{filename}")
+def serve_generated_asset(filename: str):
+    """Serve AI-generated ad posters from /generated/ folder.
+    Used in admin previews and as Meta ad image source."""
+    safe = Path(filename).name
+    fp = ROOT_DIR / "generated" / safe
+    if not fp.exists():
+        return HTMLResponse("Not found", status_code=404)
+    return FileResponse(fp)
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     with db() as conn:
