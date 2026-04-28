@@ -7,10 +7,24 @@ from __future__ import annotations
 from .db import db, init_db
 
 
+# (code, name, city, address, landline, lat, lng, radius_km)
 BRANCHES = [
-    # (code, name, city, lat, lng, radius_km)
-    ("boksburg", "PARTS-MALL Boksburg", "Boksburg",  -26.2125, 28.2624, 10),
-    ("edenvale", "PARTS-MALL Edenvale", "Edenvale",  -26.1396, 28.1546, 8),
+    (
+        "boksburg",
+        "PARTS-MALL Boksburg",
+        "Boksburg",
+        "Shop No.11, Venter Centre, Corner N Rand Rd & Rietfontein Rd, Boksburg, 1620",
+        "011 823 2610 / 1655",
+        -26.2125, 28.2624, 10,
+    ),
+    (
+        "edenvale",
+        "PARTS-MALL Edenvale",
+        "Edenvale",
+        "123 Van Riebeeck Ave, Edenvale, Johannesburg, 1609",
+        "011 462 0332",
+        -26.1396, 28.1546, 8,
+    ),
 ]
 
 # (branch_code, name, e164, number_type)
@@ -27,14 +41,16 @@ STAFF = [
 def seed() -> None:
     init_db()
     with db() as conn:
-        for code, name, city, lat, lng, radius in BRANCHES:
+        for code, name, city, address, landline, lat, lng, radius in BRANCHES:
             conn.execute(
-                """INSERT INTO branches (code, name, city, lat, lng, radius_km)
-                   VALUES (?, ?, ?, ?, ?, ?)
+                """INSERT INTO branches
+                   (code, name, city, address, landline, lat, lng, radius_km)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(code) DO UPDATE SET
                      name=excluded.name, city=excluded.city,
+                     address=excluded.address, landline=excluded.landline,
                      lat=excluded.lat, lng=excluded.lng, radius_km=excluded.radius_km""",
-                (code, name, city, lat, lng, radius),
+                (code, name, city, address, landline, lat, lng, radius),
             )
 
         for branch_code, name, e164, ntype in STAFF:

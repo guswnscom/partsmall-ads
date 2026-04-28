@@ -103,7 +103,7 @@ def serve_photo(token: str):
 def home(request: Request):
     with db() as conn:
         branches = conn.execute(
-            "SELECT code, name, city FROM branches WHERE active = 1 ORDER BY name"
+            "SELECT code, name, city, address, landline FROM branches WHERE active = 1 ORDER BY name"
         ).fetchall()
     return templates.TemplateResponse(
         request,

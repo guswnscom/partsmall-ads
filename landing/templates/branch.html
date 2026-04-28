@@ -4,6 +4,20 @@
 <section class="hero">
   <h1>{{ branch['name'] }}</h1>
   <p class="lead">Tell us what you need — we'll reply on WhatsApp.</p>
+  {% if branch['address'] %}
+    <p class="branch-address">
+      <a href="https://maps.google.com/?q={{ branch['address']|urlencode }}" target="_blank" rel="noopener">
+        📍 {{ branch['address'] }}
+      </a>
+    </p>
+  {% endif %}
+  {% if branch['landline'] %}
+    <p class="branch-landline">
+      <a href="tel:+27{{ branch['landline']|replace(' ','')|replace('/','')|trim('0') }}">
+        ☎ {{ branch['landline'] }}
+      </a>
+    </p>
+  {% endif %}
 </section>
 <form class="part-form" method="post" action="/go/{{ branch['code'] }}" enctype="multipart/form-data">
   <input type="hidden" name="utm_source" value="{{ request.query_params.get('utm_source','') }}" />

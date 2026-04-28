@@ -2,17 +2,30 @@
 {% block title %}PARTS-MALL — Pick your branch{% endblock %}
 {% block content %}
 <section class="hero">
-  <h1>Genuine Korean Auto Parts</h1>
+  <h1>Specialized Korean Auto Parts</h1>
   <p class="lead">Hyundai · Kia · Chevrolet · Suzuki · Ssangyong — and more.</p>
   <p>Choose your nearest branch to chat on WhatsApp.</p>
 </section>
 <section class="branches">
   {% for b in branches %}
-    <a class="branch-card" href="/{{ b['code'] }}">
+    <div class="branch-card">
       <h2>{{ b['name'] }}</h2>
-      <p>{{ b['city'] }}</p>
-      <span class="cta">Chat on WhatsApp →</span>
-    </a>
+      {% if b['address'] %}
+        <p class="branch-address">
+          <a href="https://maps.google.com/?q={{ b['address']|urlencode }}" target="_blank" rel="noopener">
+            📍 {{ b['address'] }}
+          </a>
+        </p>
+      {% endif %}
+      {% if b['landline'] %}
+        <p class="branch-landline">
+          <a href="tel:+27{{ b['landline']|replace(' ','')|replace('/','')|trim('0') }}">
+            ☎ {{ b['landline'] }}
+          </a>
+        </p>
+      {% endif %}
+      <a class="cta" href="/{{ b['code'] }}">Chat on WhatsApp →</a>
+    </div>
   {% endfor %}
 </section>
 {% endblock %}

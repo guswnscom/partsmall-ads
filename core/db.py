@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS branches (
     code        TEXT UNIQUE NOT NULL,        -- 'boksburg', 'edenvale'
     name        TEXT NOT NULL,               -- 'Boksburg', 'Edenvale'
     city        TEXT NOT NULL,
+    address     TEXT,                        -- full street address
+    landline    TEXT,                        -- '011 823 2610 / 1655'
     lat         REAL,
     lng         REAL,
     radius_km   INTEGER DEFAULT 10,
@@ -120,6 +122,11 @@ def init_db() -> None:
         for col in ("vin", "license_disc_path", "part_photo_path", "extracted_vin"):
             if col not in cols:
                 conn.execute(f"ALTER TABLE click_logs ADD COLUMN {col} TEXT")
+        # branches table: address + landline (added 2026-04)
+        bcols = [r["name"] for r in conn.execute("PRAGMA table_info(branches)")]
+        for col in ("address", "landline"):
+            if col not in bcols:
+                conn.execute(f"ALTER TABLE branches ADD COLUMN {col} TEXT")
 
 
 if __name__ == "__main__":
