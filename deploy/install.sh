@@ -39,6 +39,7 @@ ensure_user() {
 clone_or_pull() {
     if [[ -d "${APP_DIR}/.git" ]]; then
         echo "==> Pulling latest code"
+        chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
         sudo -u "${APP_USER}" git -C "${APP_DIR}" pull --ff-only
     else
         if [[ -z "${REPO_SLUG}" ]]; then
@@ -46,7 +47,15 @@ clone_or_pull() {
             exit 1
         fi
         echo "==> Cloning https://github.com/${REPO_SLUG}.git"
-        mkdir -p "$(dirname "${APP_DIR}")"
+        # Ensure target dir exists, is empty, and owned by partsmall before git clone
+        mkdir -p "${APP_DIR}"
+        # If a previous failed run left files, clean them
+        if [[ -n "$(ls -A "${APP_DIR}" 2>/dev/null)" ]]; then
+            echo "  (cleaning previous partial install in ${APP_DIR})"
+            rm -rf "${APP_DIR}"
+            mkdir -p "${APP_DIR}"
+        fi
+        chown "${APP_USER}:${APP_USER}" "${APP_DIR}"
         sudo -u "${APP_USER}" git clone "https://github.com/${REPO_SLUG}.git" "${APP_DIR}"
     fi
     chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
