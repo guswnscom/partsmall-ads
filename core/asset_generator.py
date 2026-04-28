@@ -313,6 +313,14 @@ STRICT VISUAL RULES — these are non-negotiable:
 7. Lighting must be physically plausible — real shadows, real reflections, no impossible glow.
 8. Composition: keep the LOWER THIRD visually quiet (uncluttered, neutral) — text and logo go there in post-production.
 
+PEOPLE / DIVERSITY RULES — when humans appear in the scene (mechanics, customers, staff):
+- Reflect South African demographics authentically. Default to a Black African subject when only ONE person is shown. When TWO or more people are shown, include a mix across these groups: Black African, White South African, Coloured (mixed-race) South African, Indian/South Asian South African, East Asian. Vary across generations (variety of ad images should not always look the same).
+- Mix genders naturally — both men and women work in workshops in SA.
+- Realistic working ages 25-55 mostly, occasional older mechanic.
+- Authentic SA workshop attire: blue or grey overalls, branded company shirts (no fake logos visible), casual shop polos.
+- Avoid only-white or only-Asian scenes. Avoid stereotypical or stock-photo casting.
+- Hands and faces must be anatomically correct — no distorted fingers, no extra limbs.
+
 CONTEXTUAL ANCHORS:
 - Market: South African automotive market, {branch_city} workshop / shop environment.
 - Vehicle fitment context: {brands_str}-segment vehicles (Korean compact and mid-size cars).
